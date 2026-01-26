@@ -6,9 +6,13 @@ export async function GET(request: NextRequest) {
   try {
     const searchParams = request.nextUrl.searchParams
     const project = searchParams.get('project')
+    const includeArchived = searchParams.get('archived') === 'true'
 
     const tasks = await prisma.task.findMany({
-      where: project ? { project } : undefined,
+      where: {
+        ...(project && { project }),
+        ...(includeArchived ? {} : { archived: false }),
+      },
       orderBy: { created_at: 'desc' },
     })
 
@@ -31,11 +35,12 @@ export async function POST(request: NextRequest) {
       data: {
         title: body.title,
         description: body.description,
-        status: body.status || 'todo',
+        status: body.status || 'backlog',
         priority: body.priority || 'medium',
         project: body.project,
         estimated_hours: body.estimated_hours,
         due_date: body.due_date ? new Date(body.due_date) : null,
+        archived: false,
       },
     })
 

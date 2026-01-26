@@ -1,0 +1,536 @@
+'use client'
+
+import { useEffect, useState } from 'react'
+import { Task } from '@/lib/types'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line } from 'recharts'
+import { Badge } from '@/components/ui/badge'
+import { format, isAfter, isBefore, subDays, startOfWeek, endOfWeek, differenceInDays } from 'date-fns'
+import { AlertTriangle, CheckCircle2, Clock, Package, TrendingUp, AlertCircle, Download, FileJson, FileSpreadsheet, Archive } from 'lucide-react'
+import { Button } from '@/components/ui/button'
+import { useState as useReactState } from 'react'
+
+export default function AnalyticsPage() {
+  const [tasks, setTasks] = useState<Task[]>([])
+  const [loading, setLoading] = useState(true)
+  const [archiving, setArchiving] = useReactState(false)
+
+  useEffect(() => {
+    const fetchTasks = async () => {
+      try {
+        const res = await fetch('/api/tasks?archived=false')
+        const data = await res.json()
+        setTasks(Array.isArray(data) ? data : [])
+      } catch (error) {
+        console.error('Error fetching tasks:', error)
+        setTasks([])
+      } finally {
+        setLoading(false)
+      }
+    }
+    fetchTasks()
+  }, [])
+
+  const handleArchiveOldTasks = async () => {
+    setArchiving(true)
+    try {
+      const res = await fetch('/api/tasks/archive-old', { method: 'POST' })
+      const data = await res.json()
+      if (data.success) {
+        alert(data.message)
+        // Refresh tasks
+        const tasksRes = await fetch('/api/tasks?archived=false')
+        const tasksData = await tasksRes.json()
+        setTasks(Array.isArray(tasksData) ? tasksData : [])
+      }
+    } catch (error) {
+      console.error('Error archiving old tasks:', error)
+      alert('Failed to archive old tasks')
+    } finally {
+      setArchiving(false)
+    }
+  }
+
+  const exportAsJSON = () => {
+    const dataStr = JSON.stringify(tasks, null, 2)
+    const dataBlob = new Blob([dataStr], { type: 'application/json' })
+    const url = URL.createObjectURL(dataBlob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = `ulrik-tasks-${format(new Date(), 'yyyy-MM-dd')}.json`
+    link.click()
+    URL.revokeObjectURL(url)
+  }
+
+  const exportAsCSV = () => {
+    const headers = ['Title', 'Description', 'Status', 'Priority', 'Project', 'Estimated Hours', 'Due Date', 'Created', 'Updated']
+    const rows = tasks.map(task => [
+      task.title,
+      task.description || '',
+      task.status,
+      task.priority,
+      task.project || '',
+      task.estimated_hours || '',
+      task.due_date ? format(new Date(task.due_date), 'yyyy-MM-dd') : '',
+      format(new Date(task.created_at), 'yyyy-MM-dd'),
+      format(new Date(task.updated_at), 'yyyy-MM-dd'),
+    ])
+    
+    const csvContent = [
+      headers.join(','),
+      ...rows.map(row => row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(','))
+    ].join('\n')
+    
+    const blob = new Blob([csvContent], { type: 'text/csv' })
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = `ulrik-tasks-${format(new Date(), 'yyyy-MM-dd')}.csv`
+    link.click()
+    URL.revokeObjectURL(url)
+  }
+
+  if (loading) {
+    return (
+      <div className="container mx-auto px-4 py-8">
+        <h1 className="text-3xl font-bold mb-8">Analytics Dashboard</h1>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {[...Array(6)].map((_, i) => (
+            <Card key={i} className="animate-pulse">
+              <CardHeader>
+                <div className="h-4 bg-muted rounded w-1/2"></div>
+              </CardHeader>
+              <CardContent>
+                <div className="h-8 bg-muted rounded w-3/4"></div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      </div>
+    )
+  }
+
+  if (tasks.length === 0) {
+    return (
+      <div className="container mx-auto px-4 py-8">
+        <h1 className="text-3xl font-bold mb-8">Analytics Dashboard</h1>
+        <Card className="text-center py-16">
+          <CardContent>
+            <Package className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
+            <h3 className="text-lg font-semibold mb-2">No Data Yet</h3>
+            <p className="text-muted-foreground">
+              Complete some tasks to see insights and analytics.
+            </p>
+          </CardContent>
+        </Card>
+      </div>
+    )
+  }
+
+  // Calculate metrics
+  const statusCounts = {
+    backlog: tasks.filter(t => t.status === 'backlog').length,
+    todo: tasks.filter(t => t.status === 'todo').length,
+    'in-progress': tasks.filter(t => t.status === 'in-progress').length,
+    review: tasks.filter(t => t.status === 'review').length,
+    done: tasks.filter(t => t.status === 'done').length,
+  }
+
+  const priorityCounts = {
+    high: tasks.filter(t => t.priority === 'high').length,
+    medium: tasks.filter(t => t.priority === 'medium').length,
+    low: tasks.filter(t => t.priority === 'low').length,
+  }
+
+  const projectBreakdown = tasks.reduce((acc, task) => {
+    const project = task.project || 'No Project'
+    if (!acc[project]) {
+      acc[project] = { total: 0, done: 0, hours: 0 }
+    }
+    acc[project].total++
+    if (task.status === 'done') acc[project].done++
+    acc[project].hours += task.estimated_hours || 0
+    return acc
+  }, {} as Record<string, { total: number; done: number; hours: number }>)
+
+  const totalHours = tasks.reduce((sum, t) => sum + (t.estimated_hours || 0), 0)
+  const hoursBacklog = tasks.filter(t => t.status === 'backlog').reduce((sum, t) => sum + (t.estimated_hours || 0), 0)
+  const hoursInProgress = tasks.filter(t => t.status === 'in-progress').reduce((sum, t) => sum + (t.estimated_hours || 0), 0)
+  const hoursDone = tasks.filter(t => t.status === 'done').reduce((sum, t) => sum + (t.estimated_hours || 0), 0)
+
+  const today = new Date()
+  const overdueTasks = tasks.filter(t => t.due_date && isBefore(new Date(t.due_date), today) && t.status !== 'done')
+  const dueSoonTasks = tasks.filter(t => {
+    if (!t.due_date || t.status === 'done') return false
+    const dueDate = new Date(t.due_date)
+    return isAfter(dueDate, today) && differenceInDays(dueDate, today) <= 7
+  })
+  const noDueDateTasks = tasks.filter(t => !t.due_date && t.status !== 'done')
+  const noEstimateTasks = tasks.filter(t => !t.estimated_hours && t.status !== 'done')
+
+  // Calculate velocity (tasks completed in last 4 weeks)
+  const last4Weeks = Array.from({ length: 4 }, (_, i) => {
+    const weekStart = startOfWeek(subDays(today, i * 7))
+    const weekEnd = endOfWeek(weekStart)
+    const completed = tasks.filter(t => {
+      const updated = new Date(t.updated_at)
+      return t.status === 'done' && isAfter(updated, weekStart) && isBefore(updated, weekEnd)
+    }).length
+    return {
+      week: format(weekStart, 'MMM dd'),
+      completed
+    }
+  }).reverse()
+
+  const longestInProgress = tasks
+    .filter(t => t.status === 'in-progress')
+    .map(t => ({
+      ...t,
+      days: differenceInDays(today, new Date(t.updated_at))
+    }))
+    .sort((a, b) => b.days - a.days)
+    .slice(0, 5)
+
+  // Chart data
+  const statusData = [
+    { name: 'Backlog', count: statusCounts.backlog, fill: '#6b7280' },
+    { name: 'To Do', count: statusCounts.todo, fill: '#3b82f6' },
+    { name: 'In Progress', count: statusCounts['in-progress'], fill: '#a855f7' },
+    { name: 'Review', count: statusCounts.review, fill: '#f97316' },
+    { name: 'Done', count: statusCounts.done, fill: '#22c55e' },
+  ]
+
+  const priorityData = [
+    { name: 'High', count: priorityCounts.high, fill: '#ef4444' },
+    { name: 'Medium', count: priorityCounts.medium, fill: '#eab308' },
+    { name: 'Low', count: priorityCounts.low, fill: '#3b82f6' },
+  ]
+
+  const projectData = Object.entries(projectBreakdown).map(([project, data]) => ({
+    project,
+    total: data.total,
+    done: data.done,
+    completion: data.total > 0 ? Math.round((data.done / data.total) * 100) : 0,
+    hours: data.hours,
+  })).sort((a, b) => b.total - a.total)
+
+  const hoursData = [
+    { name: 'Backlog', hours: hoursBacklog, fill: '#6b7280' },
+    { name: 'To Do', hours: statusCounts.todo > 0 ? (totalHours - hoursBacklog - hoursInProgress - hoursDone) / statusCounts.todo * statusCounts.todo : 0, fill: '#3b82f6' },
+    { name: 'In Progress', hours: hoursInProgress, fill: '#a855f7' },
+    { name: 'Done', hours: hoursDone, fill: '#22c55e' },
+  ]
+
+  return (
+    <div className="container mx-auto px-4 py-8">
+      <div className="flex items-center justify-between mb-8">
+        <h1 className="text-3xl font-bold">Analytics Dashboard</h1>
+        <div className="flex items-center gap-3">
+          <Badge variant="outline" className="text-sm">
+            {tasks.length} Total Tasks
+          </Badge>
+          <Badge variant="outline" className="text-sm bg-green-500/20 text-green-300 border-green-500/30">
+            {statusCounts.done} Completed
+          </Badge>
+          <div className="flex items-center gap-2 ml-2">
+            <Button size="sm" variant="outline" onClick={handleArchiveOldTasks} disabled={archiving}>
+              <Archive className="h-4 w-4 mr-2" />
+              {archiving ? 'Archiving...' : 'Archive Old'}
+            </Button>
+            <Button size="sm" variant="outline" onClick={exportAsJSON}>
+              <FileJson className="h-4 w-4 mr-2" />
+              JSON
+            </Button>
+            <Button size="sm" variant="outline" onClick={exportAsCSV}>
+              <FileSpreadsheet className="h-4 w-4 mr-2" />
+              CSV
+            </Button>
+          </div>
+        </div>
+      </div>
+
+      {/* Quick Stats */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-sm font-medium text-muted-foreground">Completion Rate</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-3xl font-bold">
+              {tasks.length > 0 ? Math.round((statusCounts.done / tasks.length) * 100) : 0}%
+            </div>
+            <p className="text-xs text-muted-foreground mt-1">
+              {statusCounts.done} of {tasks.length} tasks
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-sm font-medium text-muted-foreground">Active Work</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-3xl font-bold text-purple-400">
+              {statusCounts['in-progress']}
+            </div>
+            <p className="text-xs text-muted-foreground mt-1">
+              Tasks in progress
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-sm font-medium text-muted-foreground">Total Hours</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-3xl font-bold">
+              {totalHours.toFixed(1)}h
+            </div>
+            <p className="text-xs text-muted-foreground mt-1">
+              Estimated effort
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-sm font-medium text-muted-foreground">Weekly Velocity</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-3xl font-bold text-green-400">
+              {last4Weeks[last4Weeks.length - 1]?.completed || 0}
+            </div>
+            <p className="text-xs text-muted-foreground mt-1">
+              Tasks this week
+            </p>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Main Charts */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+        <Card>
+          <CardHeader>
+            <CardTitle>Status Distribution</CardTitle>
+            <CardDescription>Tasks across workflow stages</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <ResponsiveContainer width="100%" height={300}>
+              <BarChart data={statusData}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
+                <XAxis dataKey="name" stroke="#9ca3af" />
+                <YAxis stroke="#9ca3af" />
+                <Tooltip 
+                  contentStyle={{ backgroundColor: '#1f2937', border: '1px solid #374151', borderRadius: '8px' }}
+                  labelStyle={{ color: '#f3f4f6' }}
+                />
+                <Bar dataKey="count" radius={[8, 8, 0, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Priority Breakdown</CardTitle>
+            <CardDescription>Task distribution by priority</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <ResponsiveContainer width="100%" height={300}>
+              <PieChart>
+                <Pie
+                  data={priorityData}
+                  cx="50%"
+                  cy="50%"
+                  labelLine={false}
+                  label={({ name, percent }) => `${name} ${percent ? (percent * 100).toFixed(0) : 0}%`}
+                  outerRadius={100}
+                  dataKey="count"
+                >
+                  {priorityData.map((entry, index) => (
+                    <Cell key={`cell-${index}`} fill={entry.fill} />
+                  ))}
+                </Pie>
+                <Tooltip 
+                  contentStyle={{ backgroundColor: '#1f2937', border: '1px solid #374151', borderRadius: '8px' }}
+                />
+              </PieChart>
+            </ResponsiveContainer>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Velocity Chart */}
+      <Card className="mb-6">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <TrendingUp className="h-5 w-5" />
+            Velocity Trend
+          </CardTitle>
+          <CardDescription>Tasks completed per week (last 4 weeks)</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <ResponsiveContainer width="100%" height={250}>
+            <LineChart data={last4Weeks}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
+              <XAxis dataKey="week" stroke="#9ca3af" />
+              <YAxis stroke="#9ca3af" />
+              <Tooltip 
+                contentStyle={{ backgroundColor: '#1f2937', border: '1px solid #374151', borderRadius: '8px' }}
+                labelStyle={{ color: '#f3f4f6' }}
+              />
+              <Line type="monotone" dataKey="completed" stroke="#22c55e" strokeWidth={3} dot={{ fill: '#22c55e', r: 6 }} />
+            </LineChart>
+          </ResponsiveContainer>
+        </CardContent>
+      </Card>
+
+      {/* Project Breakdown */}
+      <Card className="mb-6">
+        <CardHeader>
+          <CardTitle>Project Breakdown</CardTitle>
+          <CardDescription>Tasks and completion rate by project</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-4">
+            {projectData.map((project) => (
+              <div key={project.project} className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <span className="font-medium">{project.project}</span>
+                    <Badge variant="outline" className="text-xs">{project.total} tasks</Badge>
+                    {project.hours > 0 && (
+                      <span className="text-xs text-muted-foreground flex items-center gap-1">
+                        <Clock className="h-3 w-3" />
+                        {project.hours.toFixed(1)}h
+                      </span>
+                    )}
+                  </div>
+                  <span className="text-sm font-semibold">{project.completion}%</span>
+                </div>
+                <div className="w-full bg-muted rounded-full h-2 overflow-hidden">
+                  <div
+                    className="h-full bg-green-500 transition-all"
+                    style={{ width: `${project.completion}%` }}
+                  />
+                </div>
+              </div>
+            ))}
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Hours Distribution */}
+      <Card className="mb-6">
+        <CardHeader>
+          <CardTitle>Time Distribution</CardTitle>
+          <CardDescription>Estimated hours by status</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <ResponsiveContainer width="100%" height={300}>
+            <BarChart data={hoursData} layout="vertical">
+              <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
+              <XAxis type="number" stroke="#9ca3af" />
+              <YAxis dataKey="name" type="category" stroke="#9ca3af" width={100} />
+              <Tooltip 
+                contentStyle={{ backgroundColor: '#1f2937', border: '1px solid #374151', borderRadius: '8px' }}
+                labelStyle={{ color: '#f3f4f6' }}
+              />
+              <Bar dataKey="hours" radius={[0, 8, 8, 0]} />
+            </BarChart>
+          </ResponsiveContainer>
+        </CardContent>
+      </Card>
+
+      {/* Health Metrics */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <AlertTriangle className="h-5 w-5 text-orange-500" />
+              Health Metrics
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="flex items-center justify-between">
+              <span className="text-sm text-muted-foreground">Overdue tasks</span>
+              <Badge variant={overdueTasks.length > 0 ? "destructive" : "outline"}>
+                {overdueTasks.length}
+              </Badge>
+            </div>
+            <div className="flex items-center justify-between">
+              <span className="text-sm text-muted-foreground">Due within 7 days</span>
+              <Badge variant="outline" className="bg-yellow-500/20 text-yellow-300 border-yellow-500/30">
+                {dueSoonTasks.length}
+              </Badge>
+            </div>
+            <div className="flex items-center justify-between">
+              <span className="text-sm text-muted-foreground">No due date</span>
+              <Badge variant="outline">{noDueDateTasks.length}</Badge>
+            </div>
+            <div className="flex items-center justify-between">
+              <span className="text-sm text-muted-foreground">No estimate</span>
+              <Badge variant="outline">{noEstimateTasks.length}</Badge>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Clock className="h-5 w-5 text-purple-500" />
+              Longest In Progress
+            </CardTitle>
+            <CardDescription>Tasks stuck in development</CardDescription>
+          </CardHeader>
+          <CardContent>
+            {longestInProgress.length > 0 ? (
+              <div className="space-y-3">
+                {longestInProgress.map((task) => (
+                  <div key={task.id} className="flex items-start justify-between gap-2">
+                    <span className="text-sm line-clamp-1 flex-1">{task.title}</span>
+                    <Badge variant="outline" className="text-xs shrink-0">
+                      {task.days}d
+                    </Badge>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-sm text-muted-foreground">No tasks in progress</p>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Upcoming Deadlines */}
+      {dueSoonTasks.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <AlertCircle className="h-5 w-5 text-yellow-500" />
+              Upcoming Deadlines (Next 7 Days)
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-3">
+              {dueSoonTasks.slice(0, 10).map((task) => (
+                <div key={task.id} className="flex items-center justify-between">
+                  <div className="flex items-center gap-3 flex-1">
+                    <span className="text-sm">{task.title}</span>
+                    {task.project && (
+                      <Badge variant="outline" className="text-xs">{task.project}</Badge>
+                    )}
+                  </div>
+                  <span className="text-xs text-muted-foreground">
+                    {task.due_date && format(new Date(task.due_date), 'MMM dd')}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+    </div>
+  )
+}

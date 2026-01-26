@@ -13,11 +13,12 @@ model Task {
   id              String   @id @default(cuid())
   title           String
   description     String?
-  status          String   @default("todo") // todo, in-progress, done
+  status          String   @default("backlog") // backlog, todo, in-progress, review, done
   priority        String   @default("medium") // low, medium, high
   project         String?
   estimated_hours Float?
   due_date        DateTime?
+  archived        Boolean  @default(false)
   created_at      DateTime @default(now())
   updated_at      DateTime @updatedAt
 }

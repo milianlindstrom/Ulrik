@@ -18,7 +18,7 @@ export function NewTaskDialog({ open, onOpenChange, onTaskCreated }: NewTaskDial
   const [formData, setFormData] = useState({
     title: '',
     description: '',
-    status: 'todo',
+    status: 'backlog',
     priority: 'medium',
     project: '',
     estimated_hours: '',
@@ -42,7 +42,7 @@ export function NewTaskDialog({ open, onOpenChange, onTaskCreated }: NewTaskDial
       setFormData({
         title: '',
         description: '',
-        status: 'todo',
+        status: 'backlog',
         priority: 'medium',
         project: '',
         estimated_hours: '',
@@ -89,8 +89,10 @@ export function NewTaskDialog({ open, onOpenChange, onTaskCreated }: NewTaskDial
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
+                  <SelectItem value="backlog">Backlog</SelectItem>
                   <SelectItem value="todo">To Do</SelectItem>
                   <SelectItem value="in-progress">In Progress</SelectItem>
+                  <SelectItem value="review">Review</SelectItem>
                   <SelectItem value="done">Done</SelectItem>
                 </SelectContent>
               </Select>

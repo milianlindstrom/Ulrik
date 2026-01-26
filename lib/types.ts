@@ -1,4 +1,4 @@
-export type TaskStatus = 'todo' | 'in-progress' | 'done'
+export type TaskStatus = 'backlog' | 'todo' | 'in-progress' | 'review' | 'done'
 export type TaskPriority = 'low' | 'medium' | 'high'
 
 export interface Task {
@@ -10,6 +10,7 @@ export interface Task {
   project: string | null
   estimated_hours: number | null
   due_date: string | null
+  archived: boolean
   created_at: string
   updated_at: string
 }
