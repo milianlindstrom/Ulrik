@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useMemo } from 'react'
 import { Task } from '@/lib/types'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line } from 'recharts'
@@ -8,28 +8,36 @@ import { Badge } from '@/components/ui/badge'
 import { format, isAfter, isBefore, subDays, startOfWeek, endOfWeek, differenceInDays } from 'date-fns'
 import { AlertTriangle, CheckCircle2, Clock, Package, TrendingUp, AlertCircle, Download, FileJson, FileSpreadsheet, Archive } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { useState as useReactState } from 'react'
+import { ProjectSwitcher } from '@/components/project-switcher'
 
 export default function AnalyticsPage() {
-  const [tasks, setTasks] = useState<Task[]>([])
+  const [allTasks, setAllTasks] = useState<Task[]>([])
+  const [selectedProjectId, setSelectedProjectId] = useState<string>('all')
   const [loading, setLoading] = useState(true)
-  const [archiving, setArchiving] = useReactState(false)
+  const [archiving, setArchiving] = useState(false)
 
   useEffect(() => {
     const fetchTasks = async () => {
       try {
         const res = await fetch('/api/tasks?archived=false')
         const data = await res.json()
-        setTasks(Array.isArray(data) ? data : [])
+        setAllTasks(Array.isArray(data) ? data : [])
       } catch (error) {
         console.error('Error fetching tasks:', error)
-        setTasks([])
+        setAllTasks([])
       } finally {
         setLoading(false)
       }
     }
     fetchTasks()
   }, [])
+
+  const tasks = useMemo(() => {
+    if (selectedProjectId === 'all') {
+      return allTasks
+    }
+    return allTasks.filter(t => t.project_id === selectedProjectId)
+  }, [allTasks, selectedProjectId])
 
   const handleArchiveOldTasks = async () => {
     setArchiving(true)
@@ -41,7 +49,7 @@ export default function AnalyticsPage() {
         // Refresh tasks
         const tasksRes = await fetch('/api/tasks?archived=false')
         const tasksData = await tasksRes.json()
-        setTasks(Array.isArray(tasksData) ? tasksData : [])
+        setAllTasks(Array.isArray(tasksData) ? tasksData : [])
       }
     } catch (error) {
       console.error('Error archiving old tasks:', error)
@@ -52,26 +60,31 @@ export default function AnalyticsPage() {
   }
 
   const exportAsJSON = () => {
+    const filename = selectedProjectId === 'all' 
+      ? `ulrik-tasks-${format(new Date(), 'yyyy-MM-dd')}.json`
+      : `ulrik-${tasks[0]?.project?.name || 'project'}-${format(new Date(), 'yyyy-MM-dd')}.json`
+    
     const dataStr = JSON.stringify(tasks, null, 2)
     const dataBlob = new Blob([dataStr], { type: 'application/json' })
     const url = URL.createObjectURL(dataBlob)
     const link = document.createElement('a')
     link.href = url
-    link.download = `ulrik-tasks-${format(new Date(), 'yyyy-MM-dd')}.json`
+    link.download = filename
     link.click()
     URL.revokeObjectURL(url)
   }
 
   const exportAsCSV = () => {
-    const headers = ['Title', 'Description', 'Status', 'Priority', 'Project', 'Estimated Hours', 'Due Date', 'Created', 'Updated']
+    const headers = ['Title', 'Description', 'Status', 'Priority', 'Project', 'Start Date', 'Due Date', 'Estimated Hours', 'Created', 'Updated']
     const rows = tasks.map(task => [
       task.title,
       task.description || '',
       task.status,
       task.priority,
-      task.project || '',
-      task.estimated_hours || '',
+      task.project?.name || '',
+      task.start_date ? format(new Date(task.start_date), 'yyyy-MM-dd') : '',
       task.due_date ? format(new Date(task.due_date), 'yyyy-MM-dd') : '',
+      task.estimated_hours || '',
       format(new Date(task.created_at), 'yyyy-MM-dd'),
       format(new Date(task.updated_at), 'yyyy-MM-dd'),
     ])
@@ -81,11 +94,15 @@ export default function AnalyticsPage() {
       ...rows.map(row => row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(','))
     ].join('\n')
     
+    const filename = selectedProjectId === 'all'
+      ? `ulrik-tasks-${format(new Date(), 'yyyy-MM-dd')}.csv`
+      : `ulrik-${tasks[0]?.project?.name || 'project'}-${format(new Date(), 'yyyy-MM-dd')}.csv`
+    
     const blob = new Blob([csvContent], { type: 'text/csv' })
     const url = URL.createObjectURL(blob)
     const link = document.createElement('a')
     link.href = url
-    link.download = `ulrik-tasks-${format(new Date(), 'yyyy-MM-dd')}.csv`
+    link.download = filename
     link.click()
     URL.revokeObjectURL(url)
   }
@@ -143,15 +160,26 @@ export default function AnalyticsPage() {
   }
 
   const projectBreakdown = tasks.reduce((acc, task) => {
-    const project = task.project || 'No Project'
-    if (!acc[project]) {
-      acc[project] = { total: 0, done: 0, hours: 0 }
+    const projectKey = task.project?.id || 'no-project'
+    const projectName = task.project?.name || 'No Project'
+    const projectIcon = task.project?.icon || '📋'
+    const projectColor = task.project?.color || '#6b7280'
+    
+    if (!acc[projectKey]) {
+      acc[projectKey] = { 
+        name: projectName, 
+        icon: projectIcon,
+        color: projectColor,
+        total: 0, 
+        done: 0, 
+        hours: 0 
+      }
     }
-    acc[project].total++
-    if (task.status === 'done') acc[project].done++
-    acc[project].hours += task.estimated_hours || 0
+    acc[projectKey].total++
+    if (task.status === 'done') acc[projectKey].done++
+    acc[projectKey].hours += task.estimated_hours || 0
     return acc
-  }, {} as Record<string, { total: number; done: number; hours: number }>)
+  }, {} as Record<string, { name: string; icon: string; color: string; total: number; done: number; hours: number }>)
 
   const totalHours = tasks.reduce((sum, t) => sum + (t.estimated_hours || 0), 0)
   const hoursBacklog = tasks.filter(t => t.status === 'backlog').reduce((sum, t) => sum + (t.estimated_hours || 0), 0)
@@ -167,6 +195,26 @@ export default function AnalyticsPage() {
   })
   const noDueDateTasks = tasks.filter(t => !t.due_date && t.status !== 'done')
   const noEstimateTasks = tasks.filter(t => !t.estimated_hours && t.status !== 'done')
+
+  // New metrics for advanced features
+  const recurringTasks = tasks.filter(t => t.is_recurring)
+  const recurringCompletionRate = recurringTasks.length > 0
+    ? Math.round((recurringTasks.filter(t => t.status === 'done').length / recurringTasks.length) * 100)
+    : 0
+
+  const tasksWithSubtasks = tasks.filter(t => t._count?.subtasks && t._count.subtasks > 0)
+  const avgSubtasksPerTask = tasksWithSubtasks.length > 0
+    ? (tasksWithSubtasks.reduce((sum, t) => sum + (t._count?.subtasks || 0), 0) / tasksWithSubtasks.length).toFixed(1)
+    : 0
+
+  const blockedTasks = tasks.filter(t =>
+    t.dependencies?.some((dep: any) => dep.depends_on_task?.status !== 'done')
+  )
+
+  const tasksWithDependencies = tasks.filter(t => t.dependencies && t.dependencies.length > 0)
+  const maxDependencyChainDepth = tasksWithDependencies.length > 0
+    ? Math.max(...tasksWithDependencies.map(t => t.dependencies?.length || 0))
+    : 0
 
   // Calculate velocity (tasks completed in last 4 weeks)
   const last4Weeks = Array.from({ length: 4 }, (_, i) => {
@@ -191,23 +239,25 @@ export default function AnalyticsPage() {
     .sort((a, b) => b.days - a.days)
     .slice(0, 5)
 
-  // Chart data
+  // Chart data - Plane-inspired colors
   const statusData = [
-    { name: 'Backlog', count: statusCounts.backlog, fill: '#6b7280' },
-    { name: 'To Do', count: statusCounts.todo, fill: '#3b82f6' },
-    { name: 'In Progress', count: statusCounts['in-progress'], fill: '#a855f7' },
-    { name: 'Review', count: statusCounts.review, fill: '#f97316' },
-    { name: 'Done', count: statusCounts.done, fill: '#22c55e' },
+    { name: 'Backlog', count: statusCounts.backlog, fill: '#64748b' },  // slate-500
+    { name: 'To Do', count: statusCounts.todo, fill: '#3b82f6' },       // blue-500
+    { name: 'In Progress', count: statusCounts['in-progress'], fill: '#a855f7' }, // purple-500
+    { name: 'Review', count: statusCounts.review, fill: '#f97316' },    // orange-500
+    { name: 'Done', count: statusCounts.done, fill: '#10b981' },        // emerald-500
   ]
 
   const priorityData = [
-    { name: 'High', count: priorityCounts.high, fill: '#ef4444' },
-    { name: 'Medium', count: priorityCounts.medium, fill: '#eab308' },
-    { name: 'Low', count: priorityCounts.low, fill: '#3b82f6' },
+    { name: 'High', count: priorityCounts.high, fill: '#f43f5e' },      // rose-500
+    { name: 'Medium', count: priorityCounts.medium, fill: '#f59e0b' },  // amber-500
+    { name: 'Low', count: priorityCounts.low, fill: '#0ea5e9' },        // sky-500
   ]
 
-  const projectData = Object.entries(projectBreakdown).map(([project, data]) => ({
-    project,
+  const projectData = Object.entries(projectBreakdown).map(([key, data]) => ({
+    project: data.name,
+    icon: data.icon,
+    color: data.color,
     total: data.total,
     done: data.done,
     completion: data.total > 0 ? Math.round((data.done / data.total) * 100) : 0,
@@ -223,16 +273,30 @@ export default function AnalyticsPage() {
 
   return (
     <div className="container mx-auto px-4 py-8">
-      <div className="flex items-center justify-between mb-8">
-        <h1 className="text-3xl font-bold">Analytics Dashboard</h1>
-        <div className="flex items-center gap-3">
-          <Badge variant="outline" className="text-sm">
-            {tasks.length} Total Tasks
-          </Badge>
-          <Badge variant="outline" className="text-sm bg-green-500/20 text-green-300 border-green-500/30">
-            {statusCounts.done} Completed
-          </Badge>
-          <div className="flex items-center gap-2 ml-2">
+      <div className="flex flex-col gap-4 mb-8">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-bold mb-2">Analytics Dashboard</h1>
+            <p className="text-sm text-muted-foreground">
+              Insights and metrics for {selectedProjectId === 'all' ? 'all projects' : 'selected project'}
+            </p>
+          </div>
+          <ProjectSwitcher
+            value={selectedProjectId}
+            onChange={setSelectedProjectId}
+            className="w-[250px]"
+          />
+        </div>
+        <div className="flex items-center justify-between flex-wrap gap-3">
+          <div className="flex items-center gap-3">
+            <Badge variant="outline" className="text-sm">
+              {tasks.length} Total Tasks
+            </Badge>
+            <Badge variant="outline" className="text-sm bg-emerald-500/20 text-emerald-300 border-emerald-500/30">
+              {statusCounts.done} Completed
+            </Badge>
+          </div>
+          <div className="flex items-center gap-2">
             <Button size="sm" variant="outline" onClick={handleArchiveOldTasks} disabled={archiving}>
               <Archive className="h-4 w-4 mr-2" />
               {archiving ? 'Archiving...' : 'Archive Old'}
@@ -289,6 +353,65 @@ export default function AnalyticsPage() {
             </div>
             <p className="text-xs text-muted-foreground mt-1">
               Estimated effort
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-sm font-medium text-muted-foreground">Blocked Tasks</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-3xl font-bold text-orange-400">
+              {blockedTasks.length}
+            </div>
+            <p className="text-xs text-muted-foreground mt-1">
+              Waiting on dependencies
+            </p>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Advanced Metrics */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-sm font-medium text-muted-foreground">Recurring Tasks</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-purple-400">
+              {recurringTasks.length}
+            </div>
+            <p className="text-xs text-muted-foreground mt-1">
+              {recurringCompletionRate}% completion rate
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-sm font-medium text-muted-foreground">Subtasks</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-blue-400">
+              {tasksWithSubtasks.length}
+            </div>
+            <p className="text-xs text-muted-foreground mt-1">
+              Avg {avgSubtasksPerTask} per parent task
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-sm font-medium text-muted-foreground">Dependencies</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-cyan-400">
+              {tasksWithDependencies.length}
+            </div>
+            <p className="text-xs text-muted-foreground mt-1">
+              Max depth: {maxDependencyChainDepth}
             </p>
           </CardContent>
         </Card>
@@ -398,6 +521,7 @@ export default function AnalyticsPage() {
               <div key={project.project} className="space-y-2">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
+                    <span className="text-lg">{project.icon}</span>
                     <span className="font-medium">{project.project}</span>
                     <Badge variant="outline" className="text-xs">{project.total} tasks</Badge>
                     {project.hours > 0 && (
@@ -411,8 +535,11 @@ export default function AnalyticsPage() {
                 </div>
                 <div className="w-full bg-muted rounded-full h-2 overflow-hidden">
                   <div
-                    className="h-full bg-green-500 transition-all"
-                    style={{ width: `${project.completion}%` }}
+                    className="h-full transition-all"
+                    style={{ 
+                      width: `${project.completion}%`,
+                      backgroundColor: project.color
+                    }}
                   />
                 </div>
               </div>
@@ -508,7 +635,7 @@ export default function AnalyticsPage() {
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
-              <AlertCircle className="h-5 w-5 text-yellow-500" />
+              <AlertCircle className="h-5 w-5 text-amber-500" />
               Upcoming Deadlines (Next 7 Days)
             </CardTitle>
           </CardHeader>
@@ -519,7 +646,17 @@ export default function AnalyticsPage() {
                   <div className="flex items-center gap-3 flex-1">
                     <span className="text-sm">{task.title}</span>
                     {task.project && (
-                      <Badge variant="outline" className="text-xs">{task.project}</Badge>
+                      <Badge 
+                        variant="outline" 
+                        className="text-xs"
+                        style={{
+                          borderColor: task.project.color + '40',
+                          backgroundColor: task.project.color + '10',
+                          color: task.project.color,
+                        }}
+                      >
+                        {task.project.icon} {task.project.name}
+                      </Badge>
                     )}
                   </div>
                   <span className="text-xs text-muted-foreground">

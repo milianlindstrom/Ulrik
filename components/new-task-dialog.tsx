@@ -1,32 +1,65 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from './ui/dialog'
 import { Button } from './ui/button'
 import { Input } from './ui/input'
 import { Textarea } from './ui/textarea'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select'
 import { Label } from './ui/label'
+import { Project } from '@/lib/types'
 
 interface NewTaskDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
   onTaskCreated: () => void
+  defaultProjectId?: string
 }
 
-export function NewTaskDialog({ open, onOpenChange, onTaskCreated }: NewTaskDialogProps) {
+export function NewTaskDialog({ open, onOpenChange, onTaskCreated, defaultProjectId }: NewTaskDialogProps) {
+  const [projects, setProjects] = useState<Project[]>([])
   const [formData, setFormData] = useState({
     title: '',
     description: '',
     status: 'backlog',
     priority: 'medium',
-    project: '',
+    project_id: defaultProjectId || '',
+    start_date: '',
     estimated_hours: '',
     due_date: '',
   })
 
+  useEffect(() => {
+    if (open) {
+      fetchProjects()
+      if (defaultProjectId) {
+        setFormData(prev => ({ ...prev, project_id: defaultProjectId }))
+      }
+    }
+  }, [open, defaultProjectId])
+
+  const fetchProjects = async () => {
+    try {
+      const res = await fetch('/api/projects')
+      const data = await res.json()
+      setProjects(data)
+      
+      // If no project selected and there are projects, select the first one
+      if (!formData.project_id && data.length > 0) {
+        setFormData(prev => ({ ...prev, project_id: data[0].id }))
+      }
+    } catch (error) {
+      console.error('Error fetching projects:', error)
+    }
+  }
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+
+    if (!formData.project_id) {
+      alert('Please select a project')
+      return
+    }
 
     try {
       await fetch('/api/tasks', {
@@ -35,6 +68,7 @@ export function NewTaskDialog({ open, onOpenChange, onTaskCreated }: NewTaskDial
         body: JSON.stringify({
           ...formData,
           estimated_hours: formData.estimated_hours ? parseFloat(formData.estimated_hours) : null,
+          start_date: formData.start_date || null,
           due_date: formData.due_date || null,
         }),
       })
@@ -44,7 +78,8 @@ export function NewTaskDialog({ open, onOpenChange, onTaskCreated }: NewTaskDial
         description: '',
         status: 'backlog',
         priority: 'medium',
-        project: '',
+        project_id: defaultProjectId || '',
+        start_date: '',
         estimated_hours: '',
         due_date: '',
       })
@@ -114,24 +149,35 @@ export function NewTaskDialog({ open, onOpenChange, onTaskCreated }: NewTaskDial
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="project">Project</Label>
-            <Input
-              id="project"
-              placeholder="e.g., Clyqra, Rookie, Study"
-              value={formData.project}
-              onChange={(e) => setFormData({ ...formData, project: e.target.value })}
-            />
+            <Label htmlFor="project_id">Project *</Label>
+            <Select 
+              value={formData.project_id} 
+              onValueChange={(value) => setFormData({ ...formData, project_id: value })}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Select a project" />
+              </SelectTrigger>
+              <SelectContent>
+                {projects.map(project => (
+                  <SelectItem key={project.id} value={project.id}>
+                    <div className="flex items-center gap-2">
+                      <span>{project.icon}</span>
+                      <span>{project.name}</span>
+                    </div>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
 
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label htmlFor="estimated_hours">Estimated Hours</Label>
+              <Label htmlFor="start_date">Start Date</Label>
               <Input
-                id="estimated_hours"
-                type="number"
-                step="0.5"
-                value={formData.estimated_hours}
-                onChange={(e) => setFormData({ ...formData, estimated_hours: e.target.value })}
+                id="start_date"
+                type="date"
+                value={formData.start_date}
+                onChange={(e) => setFormData({ ...formData, start_date: e.target.value })}
               />
             </div>
 
@@ -144,6 +190,19 @@ export function NewTaskDialog({ open, onOpenChange, onTaskCreated }: NewTaskDial
                 onChange={(e) => setFormData({ ...formData, due_date: e.target.value })}
               />
             </div>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="estimated_hours">Estimated Hours</Label>
+            <Input
+              id="estimated_hours"
+              type="number"
+              step="0.5"
+              min="0"
+              placeholder="e.g., 4.5"
+              value={formData.estimated_hours}
+              onChange={(e) => setFormData({ ...formData, estimated_hours: e.target.value })}
+            />
           </div>
 
           <div className="flex justify-end gap-2">

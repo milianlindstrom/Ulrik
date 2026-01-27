@@ -4,7 +4,7 @@ import { useDraggable } from '@dnd-kit/core'
 import { Task } from '@/lib/types'
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card'
 import { Badge } from './ui/badge'
-import { Clock, Trash2, Calendar, AlertCircle } from 'lucide-react'
+import { Clock, Trash2, Calendar, AlertCircle, Lock, ListChecks, Repeat } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Button } from './ui/button'
 import { format, differenceInDays, isBefore, isToday, isTomorrow } from 'date-fns'
@@ -25,16 +25,17 @@ export function TaskCard({ task, isDragging = false, onDelete, onClick }: TaskCa
     transform: `translate3d(${transform.x}px, ${transform.y}px, 0)`,
   } : undefined
 
+  // Plane-inspired priority colors
   const priorityColors = {
-    low: 'bg-blue-500/20 text-blue-400 border-blue-500/30',
-    medium: 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30',
-    high: 'bg-red-500/20 text-red-400 border-red-500/30',
+    low: 'bg-sky-500/15 text-sky-400 border-sky-500/30',
+    medium: 'bg-amber-500/15 text-amber-400 border-amber-500/30',
+    high: 'bg-rose-500/15 text-rose-400 border-rose-500/30',
   }
 
   const priorityBorderColors = {
-    low: 'border-l-blue-500',
-    medium: 'border-l-yellow-500',
-    high: 'border-l-red-500',
+    low: 'border-l-sky-500',
+    medium: 'border-l-amber-500',
+    high: 'border-l-rose-500',
   }
 
   // Calculate due date status
@@ -85,6 +86,18 @@ export function TaskCard({ task, isDragging = false, onDelete, onClick }: TaskCa
 
   const dueDateInfo = getDueDateInfo()
 
+  // Check if task is blocked
+  const isBlocked = task.dependencies?.some(
+    (dep: any) => dep.depends_on_task.status !== 'done'
+  )
+  const blockedCount = task.dependencies?.filter(
+    (dep: any) => dep.depends_on_task.status !== 'done'
+  ).length || 0
+
+  // Subtasks info
+  const subtaskCount = task._count?.subtasks || task.subtasks?.length || 0
+  const completedSubtasks = task.subtasks?.filter((st: any) => st.status === 'done').length || 0
+
   return (
     <Card
       ref={setNodeRef}
@@ -93,20 +106,21 @@ export function TaskCard({ task, isDragging = false, onDelete, onClick }: TaskCa
       {...attributes}
       onClick={() => onClick?.(task)}
       className={cn(
-        "cursor-grab active:cursor-grabbing transition-all duration-200 border-l-4",
-        "hover:shadow-lg hover:-translate-y-0.5",
-        isDragging && "opacity-50 shadow-2xl scale-105",
+        "group cursor-grab active:cursor-grabbing transition-all duration-150 border-l-[3px]",
+        "hover:border-border hover:shadow-md",
+        "bg-card/80 backdrop-blur-sm",
+        isDragging && "opacity-50 shadow-xl scale-[1.02] rotate-2",
         priorityBorderColors[task.priority]
       )}
     >
       <CardHeader className="pb-3 relative">
         <div className="flex items-start justify-between gap-2">
-          <CardTitle className="text-base font-medium line-clamp-2 flex-1">
+          <CardTitle className="text-sm font-semibold line-clamp-2 flex-1 leading-snug">
             {task.title}
           </CardTitle>
           <div className="flex items-center gap-1 shrink-0">
             {task.estimated_hours && (
-              <Badge variant="outline" className="text-xs font-mono px-1.5 py-0.5">
+              <Badge variant="outline" className="text-xs font-mono px-1.5 py-0.5 font-medium">
                 {task.estimated_hours}h
               </Badge>
             )}
@@ -114,7 +128,7 @@ export function TaskCard({ task, isDragging = false, onDelete, onClick }: TaskCa
               <Button
                 variant="ghost"
                 size="icon"
-                className="h-6 w-6 hover:bg-destructive/20 hover:text-destructive"
+                className="h-6 w-6 hover:bg-destructive/10 hover:text-destructive opacity-0 group-hover:opacity-100 transition-opacity"
                 onClick={(e) => {
                   e.stopPropagation()
                   onDelete(task.id)
@@ -134,8 +148,17 @@ export function TaskCard({ task, isDragging = false, onDelete, onClick }: TaskCa
         )}
         <div className="flex flex-wrap items-center gap-2">
           {task.project && (
-            <Badge variant="outline" className="text-xs font-medium">
-              {task.project}
+            <Badge 
+              variant="outline" 
+              className="text-xs font-medium"
+              style={{
+                borderColor: task.project.color + '40',
+                backgroundColor: task.project.color + '10',
+                color: task.project.color,
+              }}
+            >
+              <span className="mr-1">{task.project.icon}</span>
+              {task.project.name}
             </Badge>
           )}
           <Badge variant="outline" className={cn('text-xs font-medium', priorityColors[task.priority])}>
@@ -150,6 +173,29 @@ export function TaskCard({ task, isDragging = false, onDelete, onClick }: TaskCa
               <Calendar className={cn("h-3 w-3", dueDateInfo.showIcon && "hidden")} />
               {dueDateInfo.text}
             </div>
+          )}
+          {isBlocked && (
+            <Badge variant="outline" className="text-xs font-medium bg-orange-500/15 text-orange-400 border-orange-500/30">
+              <Lock className="h-3 w-3 mr-1" />
+              Blocked by {blockedCount}
+            </Badge>
+          )}
+          {subtaskCount > 0 && (
+            <Badge variant="outline" className="text-xs font-medium bg-blue-500/15 text-blue-400 border-blue-500/30">
+              <ListChecks className="h-3 w-3 mr-1" />
+              {completedSubtasks}/{subtaskCount}
+            </Badge>
+          )}
+          {task.is_recurring && (
+            <Badge variant="outline" className="text-xs font-medium bg-purple-500/15 text-purple-400 border-purple-500/30">
+              <Repeat className="h-3 w-3 mr-1" />
+              Recurring
+            </Badge>
+          )}
+          {task.needs_ai_briefing && (
+            <Badge variant="outline" className="text-xs font-medium bg-yellow-500/15 text-yellow-400 border-yellow-500/30">
+              ⚠️ Needs AI review
+            </Badge>
           )}
         </div>
       </CardContent>

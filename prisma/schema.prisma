@@ -9,16 +9,98 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+model Project {
+  id          String   @id @default(cuid())
+  name        String
+  slug        String   @unique
+  description String?
+  color       String   @default("#6366f1") // indigo-500 default
+  icon        String   @default("📁")
+  archived    Boolean  @default(false)
+  created_at  DateTime @default(now())
+  updated_at  DateTime @updatedAt
+  
+  tasks       Task[]
+}
+
 model Task {
-  id              String   @id @default(cuid())
-  title           String
-  description     String?
-  status          String   @default("backlog") // backlog, todo, in-progress, review, done
-  priority        String   @default("medium") // low, medium, high
-  project         String?
-  estimated_hours Float?
-  due_date        DateTime?
-  archived        Boolean  @default(false)
-  created_at      DateTime @default(now())
-  updated_at      DateTime @updatedAt
+  id                      String    @id @default(cuid())
+  title                   String
+  description             String?
+  status                  String    @default("backlog") // backlog, todo, in-progress, review, done
+  priority                String    @default("medium") // low, medium, high
+  project_id              String
+  project                 Project   @relation(fields: [project_id], references: [id], onDelete: Cascade)
+  start_date              DateTime?
+  due_date                DateTime?
+  estimated_hours         Float?
+  archived                Boolean   @default(false)
+  created_at              DateTime  @default(now())
+  updated_at              DateTime  @updatedAt
+  
+  // Dependencies (tasks that this task depends on)
+  dependencies            TaskDependency[] @relation("DependentTask")
+  blocking_tasks          TaskDependency[] @relation("BlockingTask")
+  
+  // Recurring tasks
+  is_recurring            Boolean   @default(false)
+  recurring_template_id   String?
+  recurring_template      RecurringTaskTemplate? @relation(fields: [recurring_template_id], references: [id], onDelete: SetNull)
+  recurrence_instance_date DateTime?
+  needs_ai_briefing       Boolean   @default(false)
+  
+  // Subtasks
+  parent_task_id          String?
+  parent_task             Task?     @relation("TaskSubtasks", fields: [parent_task_id], references: [id], onDelete: Cascade)
+  subtasks                Task[]    @relation("TaskSubtasks")
+  
+  @@index([project_id])
+  @@index([status])
+  @@index([archived])
+  @@index([parent_task_id])
+  @@index([recurring_template_id])
+}
+
+model TaskDependency {
+  id                String   @id @default(cuid())
+  task_id           String
+  depends_on_task_id String
+  task              Task     @relation("DependentTask", fields: [task_id], references: [id], onDelete: Cascade)
+  depends_on_task   Task     @relation("BlockingTask", fields: [depends_on_task_id], references: [id], onDelete: Cascade)
+  created_at        DateTime @default(now())
+  
+  @@unique([task_id, depends_on_task_id])
+  @@index([task_id])
+  @@index([depends_on_task_id])
+}
+
+model RecurringTaskTemplate {
+  id                  String   @id @default(cuid())
+  title               String
+  description         String?
+  project_id          String
+  priority            String   @default("medium")
+  estimated_hours     Float?
+  recurrence_pattern  String   // "daily" | "weekly" | "monthly" | "custom"
+  recurrence_config   String   // JSON string: { day_of_week?, day_of_month?, time? }
+  active              Boolean  @default(true)
+  last_generated_at   DateTime?
+  next_generation_at  DateTime
+  created_at          DateTime @default(now())
+  updated_at          DateTime @updatedAt
+  
+  tasks               Task[]
+  
+  @@index([active])
+  @@index([next_generation_at])
+}
+
+model ApiKey {
+  id            String   @id @default(cuid())
+  key_hash      String   @unique
+  name          String
+  last_used_at  DateTime?
+  created_at    DateTime @default(now())
+  
+  @@index([key_hash])
 }

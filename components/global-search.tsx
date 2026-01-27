@@ -55,7 +55,7 @@ export function GlobalSearch() {
     const filtered = allTasks.filter(task => 
       task.title.toLowerCase().includes(query) ||
       task.description?.toLowerCase().includes(query) ||
-      task.project?.toLowerCase().includes(query)
+      task.project?.name?.toLowerCase().includes(query)
     )
     setResults(filtered.slice(0, 10)) // Limit to 10 results
   }, [searchQuery, allTasks])
@@ -131,7 +131,7 @@ export function GlobalSearch() {
                       <div className="flex items-center gap-2">
                         {task.project && (
                           <Badge variant="outline" className="text-xs">
-                            {task.project}
+                            {task.project.icon} {task.project.name}
                           </Badge>
                         )}
                         <Badge variant="outline" className={cn('text-xs', priorityColors[task.priority])}>

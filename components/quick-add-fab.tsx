@@ -8,6 +8,7 @@ import { Input } from './ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select'
 import { Label } from './ui/label'
 import { cn } from '@/lib/utils'
+import { Project } from '@/lib/types'
 
 interface QuickAddFabProps {
   onTaskCreated: () => void
@@ -15,9 +16,10 @@ interface QuickAddFabProps {
 
 export function QuickAddFab({ onTaskCreated }: QuickAddFabProps) {
   const [open, setOpen] = useState(false)
+  const [projects, setProjects] = useState<Project[]>([])
   const [formData, setFormData] = useState({
     title: '',
-    project: '',
+    project_id: '',
     priority: 'medium',
   })
 
@@ -36,10 +38,31 @@ export function QuickAddFab({ onTaskCreated }: QuickAddFabProps) {
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [])
 
+  useEffect(() => {
+    if (open) {
+      fetchProjects()
+    }
+  }, [open])
+
+  const fetchProjects = async () => {
+    try {
+      const res = await fetch('/api/projects')
+      const data = await res.json()
+      setProjects(data)
+      
+      // Auto-select first project if none selected
+      if (!formData.project_id && data.length > 0) {
+        setFormData(prev => ({ ...prev, project_id: data[0].id }))
+      }
+    } catch (error) {
+      console.error('Error fetching projects:', error)
+    }
+  }
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
 
-    if (!formData.title.trim()) return
+    if (!formData.title.trim() || !formData.project_id) return
 
     try {
       await fetch('/api/tasks', {
@@ -49,13 +72,13 @@ export function QuickAddFab({ onTaskCreated }: QuickAddFabProps) {
           title: formData.title,
           status: 'backlog',
           priority: formData.priority,
-          project: formData.project || null,
+          project_id: formData.project_id,
         }),
       })
 
       setFormData({
         title: '',
-        project: '',
+        project_id: projects.length > 0 ? projects[0].id : '',
         priority: 'medium',
       })
       setOpen(false)
@@ -110,13 +133,22 @@ export function QuickAddFab({ onTaskCreated }: QuickAddFabProps) {
 
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="quick-project">Project</Label>
-                <Input
-                  id="quick-project"
-                  placeholder="e.g., Clyqra"
-                  value={formData.project}
-                  onChange={(e) => setFormData({ ...formData, project: e.target.value })}
-                />
+                <Label htmlFor="quick-project">Project *</Label>
+                <Select 
+                  value={formData.project_id} 
+                  onValueChange={(value) => setFormData({ ...formData, project_id: value })}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select project" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {projects.map(project => (
+                      <SelectItem key={project.id} value={project.id}>
+                        {project.icon} {project.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
 
               <div className="space-y-2">

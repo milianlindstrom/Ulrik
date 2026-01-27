@@ -1,16 +1,18 @@
-export type TaskStatus = 'backlog' | 'todo' | 'in-progress' | 'review' | 'done'
-export type TaskPriority = 'low' | 'medium' | 'high'
-
-export interface Task {
-  id: string
-  title: string
-  description: string | null
-  status: TaskStatus
-  priority: TaskPriority
-  project: string | null
-  estimated_hours: number | null
-  due_date: string | null
-  archived: boolean
-  created_at: string
-  updated_at: string
-}
+// Re-export shared types for backward compatibility
+export type {
+  TaskStatus,
+  TaskPriority,
+  Project,
+  Task,
+  TaskDependency,
+  RecurringTaskTemplate,
+  RecurrencePattern,
+  RecurrenceConfig,
+  ApiKey,
+  CreateTaskInput,
+  UpdateTaskInput,
+  CreateProjectInput,
+  UpdateProjectInput,
+  CreateRecurringTemplateInput,
+  UpdateRecurringTemplateInput,
+} from '../shared/types'

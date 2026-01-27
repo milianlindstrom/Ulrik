@@ -1,0 +1,42 @@
+version: '3.8'
+
+services:
+  ulrik-ui:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: ulrik-ui
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./prisma:/app/prisma
+      - ./public:/app/public
+    environment:
+      - DATABASE_URL=file:/app/prisma/dev.db
+      - NODE_ENV=production
+    restart: unless-stopped
+    networks:
+      - ulrik-network
+
+  ulrik-mcp:
+    build:
+      context: ./mcp-server
+      dockerfile: Dockerfile
+    container_name: ulrik-mcp
+    ports:
+      - "3001:3001"
+    environment:
+      - ULRIK_API_URL=http://ulrik-ui:3000
+      - MCP_SERVER_PORT=3001
+    depends_on:
+      - ulrik-ui
+    restart: unless-stopped
+    networks:
+      - ulrik-network
+
+networks:
+  ulrik-network:
+    driver: bridge
+
+volumes:
+  prisma-data:

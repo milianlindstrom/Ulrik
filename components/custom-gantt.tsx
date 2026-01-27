@@ -11,24 +11,37 @@ interface CustomGanttProps {
 }
 
 export function CustomGantt({ tasks: allTasks }: CustomGanttProps) {
-  // Filter tasks with due dates and estimated hours
-  const tasks = allTasks.filter(t => t.due_date && t.estimated_hours)
+  // Filter tasks that have either (start_date AND due_date) OR (due_date AND estimated_hours)
+  const tasks = allTasks.filter(t => {
+    if (t.start_date && t.due_date) return true
+    if (t.due_date && t.estimated_hours) return true
+    return false
+  })
 
   if (tasks.length === 0) {
     return (
       <Card className="p-12 text-center">
         <p className="text-muted-foreground">
-          No tasks with estimated hours and due dates found.
+          No tasks with date ranges found.
         </p>
         <p className="text-sm text-muted-foreground mt-2">
-          Add estimated hours and due dates to tasks to see them in the Gantt view.
+          Add start/due dates or due dates with estimated hours to see tasks in the Gantt view.
         </p>
       </Card>
     )
   }
 
-  // Calculate date range
-  const allDates = tasks.map(t => new Date(t.due_date!))
+  // Calculate date range using both start_date and due_date
+  const allDates: Date[] = []
+  tasks.forEach(t => {
+    if (t.start_date) {
+      allDates.push(new Date(t.start_date))
+    }
+    if (t.due_date) {
+      allDates.push(new Date(t.due_date))
+    }
+  })
+  
   const minDate = new Date(Math.min(...allDates.map(d => d.getTime())))
   const maxDate = new Date(Math.max(...allDates.map(d => d.getTime())))
   
@@ -39,10 +52,11 @@ export function CustomGantt({ tasks: allTasks }: CustomGanttProps) {
   const weeks = eachWeekOfInterval({ start: startDate, end: endDate })
   const totalDays = differenceInDays(endDate, startDate)
 
+  // Plane-inspired colors
   const priorityColors = {
-    high: { bg: 'bg-red-500', border: 'border-red-600', text: 'text-red-100' },
-    medium: { bg: 'bg-yellow-500', border: 'border-yellow-600', text: 'text-yellow-100' },
-    low: { bg: 'bg-blue-500', border: 'border-blue-600', text: 'text-blue-100' },
+    high: { bg: 'bg-rose-500', border: 'border-rose-600', text: 'text-rose-100' },
+    medium: { bg: 'bg-amber-500', border: 'border-amber-600', text: 'text-amber-100' },
+    low: { bg: 'bg-sky-500', border: 'border-sky-600', text: 'text-sky-100' },
   }
 
   const statusProgress = {
@@ -78,34 +92,57 @@ export function CustomGantt({ tasks: allTasks }: CustomGanttProps) {
       {/* Tasks */}
       <div className="divide-y divide-gray-800">
         {tasks.map((task) => {
-          const dueDate = new Date(task.due_date!)
-          const estimatedDays = Math.ceil((task.estimated_hours || 1) / 8)
-          const taskStart = addDays(dueDate, -estimatedDays)
+          // Use actual start_date if available, otherwise calculate from due_date and estimated_hours
+          let taskStart: Date
+          let taskEnd: Date
+          
+          if (task.start_date && task.due_date) {
+            taskStart = new Date(task.start_date)
+            taskEnd = new Date(task.due_date)
+          } else if (task.due_date && task.estimated_hours) {
+            taskEnd = new Date(task.due_date)
+            const estimatedDays = Math.ceil(task.estimated_hours / 8)
+            taskStart = addDays(taskEnd, -estimatedDays)
+          } else {
+            // Shouldn't happen due to filter, but fallback
+            return null
+          }
           
           // Calculate position
           const daysFromStart = differenceInDays(taskStart, startDate)
+          const taskDuration = differenceInDays(taskEnd, taskStart) || 1
           const leftPercent = (daysFromStart / totalDays) * 100
-          const widthPercent = (estimatedDays / totalDays) * 100
+          const widthPercent = (taskDuration / totalDays) * 100
 
           const colors = priorityColors[task.priority]
           const progress = statusProgress[task.status]
 
           return (
-            <div key={task.id} className="grid grid-cols-12 gap-4 p-4 hover:bg-gray-900/30 transition-colors">
+            <div key={task.id} className="grid grid-cols-12 gap-4 p-4 hover:bg-slate-900/30 transition-colors">
               {/* Task Info */}
               <div className="col-span-3 space-y-1">
-                <div className="text-sm font-medium text-gray-200 line-clamp-1">
+                <div className="text-sm font-medium line-clamp-1">
                   {task.title}
                 </div>
                 <div className="flex items-center gap-2 flex-wrap">
                   {task.project && (
-                    <Badge variant="outline" className="text-xs">
-                      {task.project}
+                    <Badge
+                      variant="outline"
+                      className="text-xs"
+                      style={{
+                        borderColor: task.project.color + '40',
+                        backgroundColor: task.project.color + '10',
+                        color: task.project.color,
+                      }}
+                    >
+                      {task.project.icon} {task.project.name}
                     </Badge>
                   )}
-                  <span className="text-xs text-gray-500">
-                    {task.estimated_hours}h
-                  </span>
+                  {task.estimated_hours && (
+                    <span className="text-xs text-muted-foreground">
+                      {task.estimated_hours}h
+                    </span>
+                  )}
                 </div>
               </div>
 

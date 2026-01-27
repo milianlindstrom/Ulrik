@@ -1,11 +1,11 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import { DndContext, DragEndEvent, DragOverlay, DragStartEvent, closestCorners, PointerSensor, useSensor, useSensors } from '@dnd-kit/core'
-import { Task, TaskStatus } from '@/lib/types'
+import { Task, TaskStatus, Project } from '@/lib/types'
 import { KanbanColumn } from '@/components/kanban-column'
 import { TaskCard } from '@/components/task-card'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { ProjectSwitcher } from '@/components/project-switcher'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Plus, X } from 'lucide-react'
@@ -18,8 +18,7 @@ import { isToday, isTomorrow, differenceInDays, isBefore } from 'date-fns'
 export default function KanbanPage() {
   const [tasks, setTasks] = useState<Task[]>([])
   const [allTasks, setAllTasks] = useState<Task[]>([])
-  const [selectedProject, setSelectedProject] = useState<string>('all')
-  const [projects, setProjects] = useState<string[]>([])
+  const [selectedProjectId, setSelectedProjectId] = useState<string>('all')
   const [activeTask, setActiveTask] = useState<Task | null>(null)
   const [isNewTaskOpen, setIsNewTaskOpen] = useState(false)
   const [activeFilter, setActiveFilter] = useState<string>('all')
@@ -35,35 +34,29 @@ export default function KanbanPage() {
     })
   )
 
-  const fetchTasks = async () => {
+  const fetchTasks = useCallback(async () => {
     try {
       const res = await fetch('/api/tasks')
       const data = await res.json()
       if (Array.isArray(data)) {
         setAllTasks(data)
-        // Filter tasks based on selected project
-        if (selectedProject !== 'all') {
-          setTasks(data.filter(t => t.project === selectedProject))
-        } else {
-          setTasks(data)
-        }
       }
     } catch (error) {
       console.error('Error fetching tasks:', error)
     }
-  }
+  }, [])
 
   useEffect(() => {
     fetchTasks()
-  }, [])
+  }, [fetchTasks])
 
   useEffect(() => {
     // Filter tasks when project or filter selection changes
     let filtered = allTasks
 
     // Apply project filter
-    if (selectedProject !== 'all') {
-      filtered = filtered.filter(t => t.project === selectedProject)
+    if (selectedProjectId !== 'all') {
+      filtered = filtered.filter(t => t.project_id === selectedProjectId)
     }
 
     // Apply quick filter
@@ -98,15 +91,7 @@ export default function KanbanPage() {
     }
 
     setTasks(filtered)
-  }, [selectedProject, activeFilter, allTasks])
-
-  useEffect(() => {
-    // Extract unique projects from all tasks
-    const uniqueProjects = Array.from(
-      new Set(allTasks.filter(t => t.project).map(t => t.project as string))
-    )
-    setProjects(uniqueProjects)
-  }, [allTasks])
+  }, [selectedProjectId, activeFilter, allTasks])
 
   const handleDragStart = (event: DragStartEvent) => {
     const task = tasks.find(t => t.id === event.active.id)
@@ -133,6 +118,17 @@ export default function KanbanPage() {
       setTimeout(() => setShowConfetti(false), 100)
     }
 
+    // Optimistic update BEFORE API call (Phase 4: optimistic updates)
+    const previousAllTasks = [...allTasks]
+    const previousTasks = [...tasks]
+    
+    setAllTasks(allTasks.map(t => 
+      t.id === taskId ? { ...t, status: newStatus } : t
+    ))
+    setTasks(tasks.map(t => 
+      t.id === taskId ? { ...t, status: newStatus } : t
+    ))
+
     // Update on server
     try {
       await fetch(`/api/tasks/${taskId}`, {
@@ -140,18 +136,11 @@ export default function KanbanPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ status: newStatus }),
       })
-      
-      // Optimistic update for both states
-      setAllTasks(allTasks.map(t => 
-        t.id === taskId ? { ...t, status: newStatus } : t
-      ))
-      setTasks(tasks.map(t => 
-        t.id === taskId ? { ...t, status: newStatus } : t
-      ))
     } catch (error) {
       console.error('Error updating task:', error)
       // Revert on error
-      fetchTasks()
+      setAllTasks(previousAllTasks)
+      setTasks(previousTasks)
     }
   }
 
@@ -198,19 +187,11 @@ export default function KanbanPage() {
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
         <h1 className="text-2xl md:text-3xl font-bold">Kanban Board</h1>
         <div className="flex items-center gap-2 md:gap-4 flex-wrap">
-          <Select value={selectedProject} onValueChange={setSelectedProject}>
-            <SelectTrigger className="w-[150px] md:w-[200px]">
-              <SelectValue placeholder="Filter by project" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Projects</SelectItem>
-              {projects.map(project => (
-                <SelectItem key={project} value={project}>
-                  {project}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <ProjectSwitcher
+            value={selectedProjectId}
+            onChange={setSelectedProjectId}
+            className="w-[200px] md:w-[250px]"
+          />
           <Button onClick={() => setIsNewTaskOpen(true)} className="hidden md:flex">
             <Plus className="h-4 w-4 mr-2" />
             New Task
@@ -233,14 +214,14 @@ export default function KanbanPage() {
             )}
           </Badge>
         ))}
-        {(activeFilter !== 'all' || selectedProject !== 'all') && (
+        {(activeFilter !== 'all' || selectedProjectId !== 'all') && (
           <Button
             variant="ghost"
             size="sm"
             className="h-7"
             onClick={() => {
               setActiveFilter('all')
-              setSelectedProject('all')
+              setSelectedProjectId('all')
             }}
           >
             <X className="h-3 w-3 mr-1" />

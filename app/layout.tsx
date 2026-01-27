@@ -48,6 +48,12 @@ export default function RootLayout({
                       Analytics
                     </Link>
                     <Link
+                      href="/projects"
+                      className="text-sm hover:text-primary transition-colors"
+                    >
+                      Projects
+                    </Link>
+                    <Link
                       href="/archive"
                       className="text-sm hover:text-primary transition-colors"
                     >

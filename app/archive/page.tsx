@@ -137,7 +137,7 @@ export default function ArchivePage() {
               <div className="flex items-center gap-2 flex-wrap">
                 {task.project && (
                   <Badge variant="outline" className="text-xs">
-                    {task.project}
+                    {task.project.icon} {task.project.name}
                   </Badge>
                 )}
                 <Badge variant="outline" className={cn('text-xs', priorityColors[task.priority])}>
