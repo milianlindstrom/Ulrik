@@ -611,7 +611,7 @@ export async function handleTaskTool(name: string, args: any) {
           throw new Error(error.error || `Failed to move task: ${response.statusText}`);
         }
 
-        const task = await response.json();
+        const task = await response.json() as Task;
         return {
           content: [
             {
@@ -769,7 +769,7 @@ export async function handleTaskTool(name: string, args: any) {
           throw new Error(error.error || `Failed to create subtask: ${response.statusText}`);
         }
 
-        const task = await response.json();
+        const task = await response.json() as Task;
         return {
           content: [
             {
@@ -907,7 +907,7 @@ export async function handleTaskTool(name: string, args: any) {
           throw new Error(`Failed to generate task: ${response.statusText}`);
         }
 
-        const result = await response.json();
+        const result = await response.json() as { generated: number; tasks: Task[] };
         return {
           content: [
             {
@@ -953,7 +953,7 @@ export async function handleTaskTool(name: string, args: any) {
           throw new Error(error.error || `Failed to acknowledge briefing: ${response.statusText}`);
         }
 
-        const task = await response.json();
+        const task = await response.json() as Task;
         return {
           content: [
             {
