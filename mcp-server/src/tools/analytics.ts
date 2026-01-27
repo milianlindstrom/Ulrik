@@ -1,4 +1,5 @@
 import { CONFIG } from '../config.js';
+import type { Task, RecurringTaskTemplate } from '../../../shared/types.js';
 
 export const analyticsTools = [
   {
@@ -83,7 +84,7 @@ export async function handleAnalyticsTool(name: string, args: any) {
           throw new Error(`Failed to fetch tasks: ${response.statusText}`);
         }
 
-        const tasks = await response.json();
+        const tasks = await response.json() as Task[];
         
         // Analyze tasks
         const summary = {
@@ -154,7 +155,7 @@ export async function handleAnalyticsTool(name: string, args: any) {
           throw new Error(`Failed to fetch tasks: ${response.statusText}`);
         }
 
-        const tasks = await response.json();
+        const tasks = await response.json() as Task[];
         
         // Filter to actionable tasks (todo or in-progress)
         let actionableTasks = tasks.filter((t: any) => 
@@ -205,7 +206,7 @@ export async function handleAnalyticsTool(name: string, args: any) {
         });
 
         // Sort by score and take top 3
-        scoredTasks.sort((a, b) => b.score - a.score);
+        scoredTasks.sort((a: { task: Task; score: number }, b: { task: Task; score: number }) => b.score - a.score);
         const recommendations = scoredTasks.slice(0, 3);
 
         if (recommendations.length === 0) {
@@ -219,7 +220,7 @@ export async function handleAnalyticsTool(name: string, args: any) {
           };
         }
 
-        const recommendationText = recommendations.map((rec, idx) => {
+        const recommendationText = recommendations.map((rec: { task: Task; score: number }, idx: number) => {
           const task = rec.task;
           let reason = '';
           
@@ -259,7 +260,7 @@ export async function handleAnalyticsTool(name: string, args: any) {
           throw new Error(`Failed to fetch project tasks: ${response.statusText}`);
         }
 
-        const tasks = await response.json();
+        const tasks = await response.json() as Task[];
         
         if (tasks.length === 0) {
           return {
@@ -340,7 +341,7 @@ export async function handleAnalyticsTool(name: string, args: any) {
           throw new Error(`Failed to get task: ${response.statusText}`);
         }
 
-        const task = await response.json();
+        const task = await response.json() as Task;
         
         // Analyze task complexity
         const isLarge = (task.estimated_hours && task.estimated_hours > 8) || 

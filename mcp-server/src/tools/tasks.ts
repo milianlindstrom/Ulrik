@@ -1,4 +1,11 @@
 import { CONFIG } from '../config.js';
+import type { 
+  Task, 
+  TaskDependency, 
+  RecurringTaskTemplate,
+  CreateTaskInput,
+  UpdateTaskInput
+} from '../../../shared/types.js';
 
 export const taskTools = [
   {
@@ -482,7 +489,7 @@ export async function handleTaskTool(name: string, args: any) {
           throw new Error(error.error || `Failed to create task: ${response.statusText}`);
         }
 
-        const task = await response.json();
+        const task = await response.json() as Task;
         return {
           content: [
             {
@@ -506,7 +513,7 @@ export async function handleTaskTool(name: string, args: any) {
           throw new Error(`Failed to list tasks: ${response.statusText}`);
         }
 
-        const tasks = await response.json();
+        const tasks = await response.json() as Task[];
         
         const summary = `Found ${tasks.length} task(s)`;
         const taskList = tasks
@@ -533,7 +540,7 @@ export async function handleTaskTool(name: string, args: any) {
           throw new Error(`Failed to get task: ${response.statusText}`);
         }
 
-        const task = await response.json();
+        const task = await response.json() as Task;
         
         return {
           content: [
@@ -559,7 +566,7 @@ export async function handleTaskTool(name: string, args: any) {
           throw new Error(error.error || `Failed to update task: ${response.statusText}`);
         }
 
-        const task = await response.json();
+        const task = await response.json() as Task;
         return {
           content: [
             {
@@ -630,7 +637,7 @@ export async function handleTaskTool(name: string, args: any) {
             if (!response.ok) {
               errors.push(`Task ${taskId}: ${response.statusText}`);
             } else {
-              const task = await response.json();
+              const task = await response.json() as Task;
               results.push(task);
             }
           } catch (error: any) {
@@ -664,12 +671,12 @@ export async function handleTaskTool(name: string, args: any) {
           throw new Error(error.error || `Failed to add dependency: ${response.statusText}`);
         }
 
-        const dependency = await response.json();
+        const dependency = await response.json() as TaskDependency;
         return {
           content: [
             {
               type: 'text',
-              text: `✅ Added dependency: Task "${dependency.task.title}" now depends on "${dependency.depends_on_task.title}"`,
+              text: `✅ Added dependency: Task "${dependency.task!.title}" now depends on "${dependency.depends_on_task!.title}"`,
             },
           ],
         };
@@ -733,7 +740,7 @@ export async function handleTaskTool(name: string, args: any) {
           throw new Error(`Failed to get dependency chain: ${response.statusText}`);
         }
 
-        const chain = await response.json();
+        const chain = await response.json() as Task[];
         return {
           content: [
             {
@@ -780,8 +787,8 @@ export async function handleTaskTool(name: string, args: any) {
           throw new Error(`Failed to list subtasks: ${response.statusText}`);
         }
 
-        const allTasks = await response.json();
-        const subtasks = allTasks.filter((t: any) => t.parent_task_id === args.parent_task_id);
+        const allTasks = await response.json() as Task[];
+        const subtasks = allTasks.filter((t: Task) => t.parent_task_id === args.parent_task_id);
 
         const taskList = subtasks
           .map((t: any) => `- [${t.status}] ${t.title}`)
@@ -810,7 +817,7 @@ export async function handleTaskTool(name: string, args: any) {
           throw new Error(error.error || `Failed to create template: ${response.statusText}`);
         }
 
-        const template = await response.json();
+        const template = await response.json() as RecurringTaskTemplate;
         return {
           content: [
             {
@@ -859,7 +866,7 @@ export async function handleTaskTool(name: string, args: any) {
           throw new Error(error.error || `Failed to update template: ${response.statusText}`);
         }
 
-        const template = await response.json();
+        const template = await response.json() as RecurringTaskTemplate;
         return {
           content: [
             {

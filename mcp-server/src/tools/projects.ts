@@ -1,4 +1,5 @@
 import { CONFIG } from '../config.js';
+import type { Project, CreateProjectInput, UpdateProjectInput } from '../../../shared/types.js';
 
 export const projectTools = [
   {
@@ -107,11 +108,11 @@ export async function handleProjectTool(name: string, args: any) {
           throw new Error(`Failed to list projects: ${response.statusText}`);
         }
 
-        const projects = await response.json();
+        const projects = await response.json() as Project[];
         
         const summary = `Found ${projects.length} project(s)`;
         const projectList = projects
-          .map((p: any) => `- ${p.icon} ${p.name} (${p._count?.tasks || 0} tasks) - ID: ${p.id}`)
+          .map((p: Project) => `- ${p.icon} ${p.name} (${p._count?.tasks || 0} tasks) - ID: ${p.id}`)
           .join('\n');
 
         return {
@@ -136,7 +137,7 @@ export async function handleProjectTool(name: string, args: any) {
           throw new Error(error.error || `Failed to create project: ${response.statusText}`);
         }
 
-        const project = await response.json();
+        const project = await response.json() as Project;
         return {
           content: [
             {
@@ -157,7 +158,7 @@ export async function handleProjectTool(name: string, args: any) {
           throw new Error(`Failed to get project: ${response.statusText}`);
         }
 
-        const project = await response.json();
+        const project = await response.json() as Project;
         
         return {
           content: [
@@ -183,7 +184,7 @@ export async function handleProjectTool(name: string, args: any) {
           throw new Error(error.error || `Failed to update project: ${response.statusText}`);
         }
 
-        const project = await response.json();
+        const project = await response.json() as Project;
         return {
           content: [
             {
