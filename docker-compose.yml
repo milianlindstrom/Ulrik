@@ -1,7 +1,7 @@
 services:
   ulrik-ui:
     build:
-      context: ./mcp-server
+      context: .
       dockerfile: Dockerfile
     container_name: ulrik-ui
     ports:
@@ -21,14 +21,12 @@ services:
       context: ./mcp-server
       dockerfile: Dockerfile
     container_name: ulrik-mcp
-    ports:
-      - "3001:3001"
+    command: tail -f /dev/null
     environment:
       - ULRIK_API_URL=http://ulrik-ui:3000
       - MCP_SERVER_PORT=3001
     depends_on:
       - ulrik-ui
-    restart: unless-stopped
     networks:
       - ulrik-network
 
