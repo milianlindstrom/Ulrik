@@ -93,9 +93,9 @@ export async function PATCH(
     if (body.parent_task_id !== undefined) updateData.parent_task_id = body.parent_task_id
     if (body.needs_ai_briefing !== undefined) updateData.needs_ai_briefing = body.needs_ai_briefing
     
-    // Check if moving to in-progress - validate dependencies
+    // Check if moving to in-progress or done - validate dependencies
     if (body.status !== undefined) {
-      if (body.status === 'in-progress') {
+      if (body.status === 'in-progress' || body.status === 'done') {
         // Check if task has incomplete dependencies
         const dependencies = await prisma.taskDependency.findMany({
           where: { task_id: id },
@@ -110,9 +110,12 @@ export async function PATCH(
           const depTitles = incompleteDeps
             .map((dep) => dep.depends_on_task.title)
             .join(', ')
+          const statusMessage = body.status === 'done' 
+            ? 'Cannot move to done' 
+            : 'Cannot move to in-progress'
           return NextResponse.json(
             {
-              error: `Cannot move to in-progress. Task is blocked by: ${depTitles}`,
+              error: `${statusMessage}. Task is blocked by: ${depTitles}`,
               blocked_by: incompleteDeps.map((dep) => dep.depends_on_task),
             },
             { status: 400 }

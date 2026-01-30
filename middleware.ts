@@ -4,6 +4,15 @@ import { verifyTokenOnly } from './lib/auth-server'
 
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl
+  
+  // Allow static files from public folder (images, SVGs, etc.)
+  const staticFileExtensions = ['.svg', '.png', '.jpg', '.jpeg', '.gif', '.ico', '.webp', '.css', '.js']
+  const isStaticFile = staticFileExtensions.some(ext => pathname.endsWith(ext))
+  
+  if (isStaticFile) {
+    return NextResponse.next()
+  }
+  
   // Use token verification only (no database) for middleware
   const tokenPayload = await verifyTokenOnly(request)
 
@@ -37,7 +46,8 @@ export const config = {
      * - _next/static (static files)
      * - _next/image (image optimization files)
      * - favicon.ico (favicon file)
+     * - Static file extensions (svg, png, jpg, etc.)
      */
-    '/((?!api|_next/static|_next/image|favicon.ico).*)',
+    '/((?!api|_next|favicon.ico|.*\\.svg|.*\\.png|.*\\.jpg|.*\\.jpeg|.*\\.gif|.*\\.ico|.*\\.webp|.*\\.css|.*\\.js).*)',
   ],
 }

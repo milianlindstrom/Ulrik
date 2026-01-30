@@ -23,7 +23,14 @@ WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 # Ensure logo is in public folder (must be done before build)
-RUN if [ -f ulriklogo.svg ]; then mkdir -p public && cp ulriklogo.svg public/ulriklogo.svg && echo "Logo copied"; else echo "Logo file not found"; fi && ls -la public/ || true
+RUN mkdir -p public && \
+    if [ -f ulriklogo.svg ]; then \
+      cp ulriklogo.svg public/ulriklogo.svg && \
+      echo "Logo copied to public folder"; \
+    else \
+      echo "Warning: Logo file not found"; \
+    fi && \
+    ls -la public/ || echo "Public folder created"
 
 # Generate Prisma Client
 RUN npx prisma generate

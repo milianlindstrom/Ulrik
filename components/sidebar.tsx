@@ -12,7 +12,8 @@ import {
   Settings,
   Repeat,
   ChevronRight,
-  Check
+  Check,
+  Home
 } from 'lucide-react'
 import { Project } from '@/lib/types'
 import { cn } from '@/lib/utils'
@@ -48,6 +49,7 @@ export function Sidebar({ className, isOpen, onClose }: SidebarProps) {
   const selectedProject = projects.find(p => p.id === selectedProjectId)
 
   const navigation = [
+    { name: 'Dashboard', href: '/', icon: Home },
     { name: 'Kanban', href: '/kanban', icon: LayoutDashboard },
     { name: 'Gantt', href: '/gantt', icon: Calendar },
     { name: 'Analytics', href: '/analytics', icon: BarChart3 },
@@ -231,11 +233,11 @@ export function Sidebar({ className, isOpen, onClose }: SidebarProps) {
       {/* Footer/Shortcuts */}
       <div className="p-6 border-t space-y-2 text-xs text-muted-foreground/60">
         <div className="flex items-center gap-2">
-          <kbd className="px-1.5 py-0.5 bg-muted text-xs">Ctrl/⌘ F</kbd>
+          <kbd className="px-1.5 py-0.5 bg-muted text-xs">Ctrl/⌘ K</kbd>
           <span>Search</span>
         </div>
         <div className="flex items-center gap-2">
-          <kbd className="px-1.5 py-0.5 bg-muted text-xs">Ctrl/⌘ K</kbd>
+          <kbd className="px-1.5 py-0.5 bg-muted text-xs">Ctrl/⌘ N</kbd>
           <span>Quick Add</span>
         </div>
       </div>

@@ -27,7 +27,8 @@ export function QuickAddFab({ onTaskCreated }: QuickAddFabProps) {
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+      // Use Cmd/Ctrl+N for quick add (standard "new" shortcut)
+      if ((e.metaKey || e.ctrlKey) && e.key === 'n') {
         e.preventDefault()
         setOpen(true)
       }

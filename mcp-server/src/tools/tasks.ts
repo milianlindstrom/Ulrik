@@ -1055,7 +1055,11 @@ export async function handleTaskTool(name: string, args: any) {
 
       // AI Briefings
       case 'get_pending_briefings': {
-        const response = await fetch(`${apiUrl}/api/recurring/generate?action=pending-briefings`);
+        // Try dedicated endpoint first, fallback to query param
+        let response = await fetch(`${apiUrl}/api/recurring/pending-briefings`).catch(() => null);
+        if (!response || !response.ok) {
+          response = await fetch(`${apiUrl}/api/recurring/generate?action=pending-briefings`);
+        }
 
         if (!response.ok) {
           throw new Error(`Failed to get pending briefings: ${response.statusText}`);

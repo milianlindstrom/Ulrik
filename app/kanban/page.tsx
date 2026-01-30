@@ -132,16 +132,29 @@ export default function KanbanPage() {
 
     // Update on server
     try {
-      await fetch(`/api/tasks/${taskId}`, {
+      const response = await fetch(`/api/tasks/${taskId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ status: newStatus }),
       })
+      
+      if (!response.ok) {
+        const errorData = await response.json()
+        // Revert on error
+        setAllTasks(previousAllTasks)
+        setTasks(previousTasks)
+        // Show error message
+        if (errorData.error) {
+          alert(errorData.error)
+        }
+        return
+      }
     } catch (error) {
       console.error('Error updating task:', error)
       // Revert on error
       setAllTasks(previousAllTasks)
       setTasks(previousTasks)
+      alert('Failed to update task. Please try again.')
     }
   }
 
