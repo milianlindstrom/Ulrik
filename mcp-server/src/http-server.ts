@@ -10,6 +10,7 @@ import { validateConfig } from './config.js';
 import { taskTools, handleTaskTool } from './tools/tasks.js';
 import { projectTools, handleProjectTool } from './tools/projects.js';
 import { analyticsTools, handleAnalyticsTool } from './tools/analytics.js';
+import { sprintTools, handleSprintTool } from './tools/sprints.js';
 
 // Validate configuration
 validateConfig();
@@ -31,7 +32,7 @@ const server = new Server(
 );
 
 // Combine all tools
-const allTools = [...taskTools, ...projectTools, ...analyticsTools];
+const allTools = [...taskTools, ...projectTools, ...analyticsTools, ...sprintTools];
 
 // Handle tool list requests
 server.setRequestHandler(ListToolsRequestSchema, async () => {
@@ -62,6 +63,12 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
     } else if (name.startsWith('get_task_summary') || name.startsWith('what_should_i_work_on') ||
                name.startsWith('analyze_project_health') || name.startsWith('suggest_task_breakdown')) {
       return await handleAnalyticsTool(name, args);
+    } else if (name.startsWith('list_sprints') || name.startsWith('create_sprint') || 
+               name.startsWith('get_sprint') || name.startsWith('update_sprint') || 
+               name.startsWith('delete_sprint') || name.startsWith('add_task_to_sprint') ||
+               name.startsWith('remove_task_from_sprint') || name.startsWith('update_sprint_task') ||
+               name.startsWith('get_sprint_velocity')) {
+      return await handleSprintTool(name, args);
     }
 
     throw new Error(`Unknown tool: ${name}`);

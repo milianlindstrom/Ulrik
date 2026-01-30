@@ -15,4 +15,12 @@ export type {
   UpdateProjectInput,
   CreateRecurringTemplateInput,
   UpdateRecurringTemplateInput,
+  Sprint,
+  SprintTask,
+  VelocityMetric,
+  SprintStatus,
+  CreateSprintInput,
+  UpdateSprintInput,
+  AddTaskToSprintInput,
+  UpdateSprintTaskInput,
 } from '../shared/types'

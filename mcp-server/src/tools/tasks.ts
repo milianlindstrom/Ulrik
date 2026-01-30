@@ -807,11 +807,31 @@ export async function handleTaskTool(name: string, args: any) {
         }
 
         const dependency = await response.json() as TaskDependency;
+        
+        // Fetch task details if not included in response
+        let taskTitle = dependency.task?.title;
+        let dependsOnTitle = dependency.depends_on_task?.title;
+        
+        if (!taskTitle || !dependsOnTitle) {
+          const [taskRes, dependsOnRes] = await Promise.all([
+            fetch(`${apiUrl}/api/tasks/${dependency.task_id}`),
+            fetch(`${apiUrl}/api/tasks/${dependency.depends_on_task_id}`),
+          ]);
+          if (taskRes.ok) {
+            const task = await taskRes.json() as Task;
+            taskTitle = task.title;
+          }
+          if (dependsOnRes.ok) {
+            const dependsOn = await dependsOnRes.json() as Task;
+            dependsOnTitle = dependsOn.title;
+          }
+        }
+        
         return {
           content: [
             {
               type: 'text',
-              text: `✅ Added dependency: Task "${dependency.task!.title}" now depends on "${dependency.depends_on_task!.title}"`,
+              text: `✅ Added dependency: Task "${taskTitle || dependency.task_id}" now depends on "${dependsOnTitle || dependency.depends_on_task_id}"`,
             },
           ],
         };
@@ -889,11 +909,20 @@ export async function handleTaskTool(name: string, args: any) {
       // Subtasks
       case 'create_subtask': {
         const { parent_task_id, ...taskData } = args;
+        
+        // Fetch parent task to get project_id
+        const parentTaskResponse = await fetch(`${apiUrl}/api/tasks/${parent_task_id}`);
+        if (!parentTaskResponse.ok) {
+          throw new Error('Parent task not found');
+        }
+        const parentTask = await parentTaskResponse.json() as Task;
+        
         const response = await fetch(`${apiUrl}/api/tasks`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             ...taskData,
+            project_id: parentTask.project_id,
             parent_task_id,
             status: 'todo',
           }),

@@ -13,7 +13,8 @@ import {
   Repeat,
   ChevronRight,
   Check,
-  Home
+  Home,
+  Rocket
 } from 'lucide-react'
 import { Project } from '@/lib/types'
 import { cn } from '@/lib/utils'
@@ -51,6 +52,8 @@ export function Sidebar({ className, isOpen, onClose }: SidebarProps) {
   const navigation = [
     { name: 'Dashboard', href: '/', icon: Home },
     { name: 'Kanban', href: '/kanban', icon: LayoutDashboard },
+    { name: 'Sprints', href: '/sprints', icon: Rocket },
+    { name: 'Backlog', href: '/backlog', icon: FolderOpen },
     { name: 'Gantt', href: '/gantt', icon: Calendar },
     { name: 'Analytics', href: '/analytics', icon: BarChart3 },
     { name: 'Recurring', href: '/recurring', icon: Repeat },

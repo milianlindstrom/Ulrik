@@ -2,6 +2,7 @@
 export type TaskStatus = 'backlog' | 'todo' | 'in-progress' | 'review' | 'done'
 export type TaskPriority = 'low' | 'medium' | 'high'
 export type RecurrencePattern = 'daily' | 'weekly' | 'monthly' | 'custom'
+export type SprintStatus = 'planned' | 'active' | 'completed'
 
 export interface Project {
   id: string
@@ -14,8 +15,10 @@ export interface Project {
   created_at: string
   updated_at: string
   tasks?: Task[]
+  sprints?: Sprint[]
   _count?: {
     tasks: number
+    sprints?: number
   }
 }
 
@@ -61,6 +64,9 @@ export interface Task {
   _count?: {
     subtasks?: number
   }
+  
+  // Sprints
+  sprint_tasks?: SprintTask[]
 }
 
 export interface RecurringTaskTemplate {
@@ -156,4 +162,78 @@ export interface UpdateProjectInput {
   color?: string
   icon?: string
   archived?: boolean
+}
+
+// Sprint types
+export interface Sprint {
+  id: string
+  name: string
+  description: string | null
+  start_date: string
+  end_date: string
+  status: SprintStatus
+  project_id: string
+  project?: Project
+  created_at: string
+  updated_at: string
+  sprint_tasks?: SprintTask[]
+  velocity_metrics?: VelocityMetric[]
+  _count?: {
+    sprint_tasks: number
+  }
+}
+
+export interface SprintTask {
+  id: string
+  sprint_id: string
+  task_id: string
+  sprint?: Sprint
+  task?: Task
+  story_points: number | null
+  order: number
+  status: string
+  created_at: string
+  updated_at: string
+}
+
+export interface VelocityMetric {
+  id: string
+  sprint_id: string
+  sprint?: Sprint
+  planned_points: number
+  completed_points: number
+  completed_tasks: number
+  total_tasks: number
+  created_at: string
+  updated_at: string
+}
+
+export interface CreateSprintInput {
+  name: string
+  description?: string
+  start_date: string
+  end_date: string
+  status?: SprintStatus
+  project_id: string
+}
+
+export interface UpdateSprintInput {
+  name?: string
+  description?: string
+  start_date?: string
+  end_date?: string
+  status?: SprintStatus
+}
+
+export interface AddTaskToSprintInput {
+  task_id: string
+  story_points?: number
+  order?: number
+  status?: string
+}
+
+export interface UpdateSprintTaskInput {
+  story_points?: number
+  order?: number
+  status?: string
 }

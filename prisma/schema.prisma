@@ -19,41 +19,45 @@ model Project {
   archived    Boolean  @default(false)
   created_at  DateTime @default(now())
   updated_at  DateTime @updatedAt
-  
-  tasks       Task[]
+
+  tasks   Task[]
+  sprints Sprint[]
 }
 
 model Task {
-  id                      String    @id @default(cuid())
-  title                   String
-  description             String?
-  status                  String    @default("backlog") // backlog, todo, in-progress, review, done
-  priority                String    @default("medium") // low, medium, high
-  project_id              String
-  project                 Project   @relation(fields: [project_id], references: [id], onDelete: Cascade)
-  start_date              DateTime?
-  due_date                DateTime?
-  estimated_hours         Float?
-  archived                Boolean   @default(false)
-  created_at              DateTime  @default(now())
-  updated_at              DateTime  @updatedAt
-  
+  id              String    @id @default(cuid())
+  title           String
+  description     String?
+  status          String    @default("backlog") // backlog, todo, in-progress, review, done
+  priority        String    @default("medium") // low, medium, high
+  project_id      String
+  project         Project   @relation(fields: [project_id], references: [id], onDelete: Cascade)
+  start_date      DateTime?
+  due_date        DateTime?
+  estimated_hours Float?
+  archived        Boolean   @default(false)
+  created_at      DateTime  @default(now())
+  updated_at      DateTime  @updatedAt
+
   // Dependencies (tasks that this task depends on)
-  dependencies            TaskDependency[] @relation("DependentTask")
-  blocking_tasks          TaskDependency[] @relation("BlockingTask")
-  
+  dependencies   TaskDependency[] @relation("DependentTask")
+  blocking_tasks TaskDependency[] @relation("BlockingTask")
+
   // Recurring tasks
-  is_recurring            Boolean   @default(false)
-  recurring_template_id   String?
-  recurring_template      RecurringTaskTemplate? @relation(fields: [recurring_template_id], references: [id], onDelete: SetNull)
+  is_recurring             Boolean                @default(false)
+  recurring_template_id    String?
+  recurring_template       RecurringTaskTemplate? @relation(fields: [recurring_template_id], references: [id], onDelete: SetNull)
   recurrence_instance_date DateTime?
-  needs_ai_briefing       Boolean   @default(false)
-  
+  needs_ai_briefing        Boolean                @default(false)
+
   // Subtasks
-  parent_task_id          String?
-  parent_task             Task?     @relation("TaskSubtasks", fields: [parent_task_id], references: [id], onDelete: Cascade)
-  subtasks                Task[]    @relation("TaskSubtasks")
-  
+  parent_task_id String?
+  parent_task    Task?   @relation("TaskSubtasks", fields: [parent_task_id], references: [id], onDelete: Cascade)
+  subtasks       Task[]  @relation("TaskSubtasks")
+
+  // Sprints
+  sprint_tasks SprintTask[]
+
   @@index([project_id])
   @@index([status])
   @@index([archived])
@@ -62,56 +66,109 @@ model Task {
 }
 
 model TaskDependency {
-  id                String   @id @default(cuid())
-  task_id           String
+  id                 String   @id @default(cuid())
+  task_id            String
   depends_on_task_id String
-  task              Task     @relation("DependentTask", fields: [task_id], references: [id], onDelete: Cascade)
-  depends_on_task   Task     @relation("BlockingTask", fields: [depends_on_task_id], references: [id], onDelete: Cascade)
-  created_at        DateTime @default(now())
-  
+  task               Task     @relation("DependentTask", fields: [task_id], references: [id], onDelete: Cascade)
+  depends_on_task    Task     @relation("BlockingTask", fields: [depends_on_task_id], references: [id], onDelete: Cascade)
+  created_at         DateTime @default(now())
+
   @@unique([task_id, depends_on_task_id])
   @@index([task_id])
   @@index([depends_on_task_id])
 }
 
 model RecurringTaskTemplate {
-  id                  String   @id @default(cuid())
-  title               String
-  description         String?
-  project_id          String
-  priority            String   @default("medium")
-  estimated_hours     Float?
-  recurrence_pattern  String   // "daily" | "weekly" | "monthly" | "custom"
-  recurrence_config   String   // JSON string: { day_of_week?, day_of_month?, time? }
-  active              Boolean  @default(true)
-  last_generated_at   DateTime?
-  next_generation_at  DateTime
-  created_at          DateTime @default(now())
-  updated_at          DateTime @updatedAt
-  
-  tasks               Task[]
-  
+  id                 String    @id @default(cuid())
+  title              String
+  description        String?
+  project_id         String
+  priority           String    @default("medium")
+  estimated_hours    Float?
+  recurrence_pattern String // "daily" | "weekly" | "monthly" | "custom"
+  recurrence_config  String // JSON string: { day_of_week?, day_of_month?, time? }
+  active             Boolean   @default(true)
+  last_generated_at  DateTime?
+  next_generation_at DateTime
+  created_at         DateTime  @default(now())
+  updated_at         DateTime  @updatedAt
+
+  tasks Task[]
+
   @@index([active])
   @@index([next_generation_at])
 }
 
 model ApiKey {
-  id            String   @id @default(cuid())
-  key_hash      String   @unique
-  name          String
-  last_used_at  DateTime?
-  created_at    DateTime @default(now())
-  
+  id           String    @id @default(cuid())
+  key_hash     String    @unique
+  name         String
+  last_used_at DateTime?
+  created_at   DateTime  @default(now())
+
   @@index([key_hash])
 }
 
 model User {
-  id                  String   @id @default(cuid())
-  username            String   @unique
-  password_hash       String
+  id                   String   @id @default(cuid())
+  username             String   @unique
+  password_hash        String
   onboarding_completed Boolean  @default(false)
-  created_at          DateTime @default(now())
-  updated_at          DateTime @updatedAt
-  
+  created_at           DateTime @default(now())
+  updated_at           DateTime @updatedAt
+
   @@index([username])
+}
+
+model Sprint {
+  id          String   @id @default(cuid())
+  name        String
+  description String?
+  start_date  DateTime
+  end_date    DateTime
+  status      String   @default("planned") // planned, active, completed
+  project_id  String
+  project     Project  @relation(fields: [project_id], references: [id], onDelete: Cascade)
+  created_at  DateTime @default(now())
+  updated_at  DateTime @updatedAt
+
+  sprint_tasks     SprintTask[]
+  velocity_metrics VelocityMetric[]
+
+  @@index([project_id])
+  @@index([status])
+  @@index([start_date])
+  @@index([end_date])
+}
+
+model SprintTask {
+  id           String   @id @default(cuid())
+  sprint_id    String
+  task_id      String
+  sprint       Sprint   @relation(fields: [sprint_id], references: [id], onDelete: Cascade)
+  task         Task     @relation(fields: [task_id], references: [id], onDelete: Cascade)
+  story_points Float? // Story point estimate
+  order        Int      @default(0) // Order within sprint
+  status       String   @default("todo") // Status within sprint context
+  created_at   DateTime @default(now())
+  updated_at   DateTime @updatedAt
+
+  @@unique([sprint_id, task_id])
+  @@index([sprint_id])
+  @@index([task_id])
+  @@index([order])
+}
+
+model VelocityMetric {
+  id               String   @id @default(cuid())
+  sprint_id        String
+  sprint           Sprint   @relation(fields: [sprint_id], references: [id], onDelete: Cascade)
+  planned_points   Float    @default(0)
+  completed_points Float    @default(0)
+  completed_tasks  Int      @default(0)
+  total_tasks      Int      @default(0)
+  created_at       DateTime @default(now())
+  updated_at       DateTime @updatedAt
+
+  @@index([sprint_id])
 }
